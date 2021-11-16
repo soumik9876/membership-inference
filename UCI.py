@@ -1,41 +1,57 @@
 import keras
 import numpy as np
 from sklearn.utils import resample
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
 
 LEARNING_RATE = 0.001
 EPOCH = 100
 TRAINING_SIZE = 3000
-TEST_SIZE = 2000
+TEST_SIZE = 1500
 NUM_TARGET = 1
 NUM_SHADOW = 20
 IN = 1
 OUT = 0
 VERBOSE = 1
 
+
 def load_data(path='UCI.adult.data'):
     from keras.utils.data_utils import get_file
-    import pandas as pd
-    from sklearn.preprocessing import LabelEncoder
-    from sklearn.model_selection import train_test_split
 
     path = get_file(path, origin='http://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data')
     f = pd.read_csv(path, header=None)
 
     # encode the categorical values
-    for col in [1,3,5,6,7,8,9,13,14]:
+    for col in [1, 3, 5, 6, 7, 8, 9, 13, 14]:
         le = LabelEncoder()
         f[col] = le.fit_transform(f[col].astype('str'))
-    
+
     # normalize the values
     x_range = [i for i in range(14)]
-    f[x_range] = f[x_range]/f[x_range].max()
+    f[x_range] = f[x_range] / f[x_range].max()
 
     x = f[x_range].values
     y = f[14].values
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.30, random_state=0)
     return (x_train, y_train), (x_test, y_test)
 
-def sample_data(train_data,test_data,num_sets):
+
+def load_senti_data(data):
+    dataframe = pd.read_csv(f"sent_nob/{data}", header=None)
+    le = LabelEncoder()
+    for col in range(2):
+        dataframe[col] = le.fit_transform(dataframe[col].astype('str'))
+    x_range = [i for i in range(2)]
+    dataframe[x_range] = dataframe[x_range] / dataframe[x_range].max()
+
+    x = dataframe[0].values
+    y = dataframe[1].values
+    print(x,y)
+    return x, y
+
+
+def sample_data(train_data, test_data, num_sets):
     (x_train, y_train), (x_test, y_test) = train_data, test_data
     new_x_train, new_y_train = [], []
     new_x_test, new_y_test = [], []
@@ -43,17 +59,19 @@ def sample_data(train_data,test_data,num_sets):
         x_temp, y_temp = resample(x_train, y_train, n_samples=TRAINING_SIZE, random_state=0)
         new_x_train.append(x_temp)
         new_y_train.append(y_temp)
+        print(TEST_SIZE)
         x_temp, y_temp = resample(x_test, y_test, n_samples=TEST_SIZE, random_state=0)
         new_x_test.append(x_temp)
         new_y_test.append(y_temp)
     return (new_x_train, new_y_train), (new_x_test, new_y_test)
+
 
 def build_fcnn_model():
     from keras.models import Sequential
     from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
     # build the model
     model = Sequential()
-    model.add(Dense(512, input_dim=14, activation='tanh'))
+    model.add(Dense(512, input_dim=1, activation='tanh'))
     model.add(Dense(512, activation='tanh'))
     model.add(Dense(256, activation='tanh'))
     model.add(Dense(128, activation='tanh'))
@@ -61,6 +79,7 @@ def build_fcnn_model():
 
     model.summary()
     return model
+
 
 def get_trained_keras_models(keras_model, train_data, test_data, num_models):
     (x_train, y_train), (x_test, y_test) = train_data, test_data
@@ -74,6 +93,7 @@ def get_trained_keras_models(keras_model, train_data, test_data, num_models):
         print('\n', 'Model ', i, ' test accuracy:', score[1])
     return models
 
+
 def get_attack_dataset(models, train_data, test_data, num_models, data_size):
     # generate dataset for the attack model
     (x_train, y_train), (x_test, y_test) = train_data, test_data
@@ -84,15 +104,16 @@ def get_attack_dataset(models, train_data, test_data, num_models, data_size):
         x_temp, y_temp = resample(x_train[i], y_train[i], n_samples=data_size, random_state=0)
         for j in range(data_size):
             y_idx = np.argmax(y_temp[j])
-            x_data[y_idx].append(models[i].predict(x_temp[j:j+1])[0])
+            x_data[y_idx].append(models[i].predict(x_temp[j:j + 1])[0])
             y_data[y_idx].append(IN)
         # OUT data
         x_temp, y_temp = resample(x_test[i], y_test[i], n_samples=data_size, random_state=0)
         for j in range(data_size):
             y_idx = np.argmax(y_temp[j])
-            x_data[y_idx].append(models[i].predict(x_temp[j:j+1])[0])
+            x_data[y_idx].append(models[i].predict(x_temp[j:j + 1])[0])
             y_data[y_idx].append(OUT)
     return x_data, y_data
+
 
 def get_trained_svm_models(train_data, test_data, num_models=1):
     from sklearn import svm
@@ -100,24 +121,29 @@ def get_trained_svm_models(train_data, test_data, num_models=1):
     models = []
     for i in range(num_models):
         print('Training svm model : ', i)
-        models.append(svm.SVC(gamma='scale',kernel='linear',verbose=VERBOSE))
+        models.append(svm.SVC(gamma='scale', kernel='linear', verbose=VERBOSE))
         models[i].fit(x_train[i], y_train[i])
-        score = models[i].score(x_test[i],y_test[i])
-        print('SVM model ', i, 'score : ',score)
+        score = models[i].score(x_test[i], y_test[i])
+        print('SVM model ', i, 'score : ', score)
     return models
+
 
 def main():
     print('Hello World!')
     # load the pre-shuffled train and test data
-    (x_train, y_train), (x_test, y_test) = load_data()
+    # print(load_senti_data('Train.csv'))
+    # return
+    # (x_train, y_train), (x_test, y_test) = load_data()
 
+    x_train, y_train = load_senti_data('Train.csv')
+    x_test, y_test = load_senti_data('Test.csv')
     # split the data for each model
-    target_train = (x_train[:TRAINING_SIZE*NUM_TARGET],y_train[:TRAINING_SIZE*NUM_TARGET])
-    target_test = (x_test[:TEST_SIZE*NUM_TARGET],y_test[:TEST_SIZE*NUM_TARGET])
+    target_train = (x_train[:TRAINING_SIZE * NUM_TARGET], y_train[:TRAINING_SIZE * NUM_TARGET])
+    target_test = (x_test[:TEST_SIZE * NUM_TARGET], y_test[:TEST_SIZE * NUM_TARGET])
     target_train_data, target_test_data = sample_data(target_train, target_test, NUM_TARGET)
 
-    shadow_train = (x_train[TRAINING_SIZE*NUM_TARGET:],y_train[TRAINING_SIZE*NUM_TARGET:])
-    shadow_test = (x_test[TEST_SIZE*NUM_TARGET:],y_test[TEST_SIZE*NUM_TARGET:])
+    shadow_train = (x_train[TRAINING_SIZE * NUM_TARGET:], y_train[TRAINING_SIZE * NUM_TARGET:])
+    shadow_test = (x_test[TEST_SIZE * NUM_TARGET:], y_test[TEST_SIZE * NUM_TARGET:])
     shadow_train_data, shadow_test_data = sample_data(shadow_train, shadow_test, NUM_SHADOW)
 
     cnn_model = build_fcnn_model()
@@ -137,5 +163,5 @@ def main():
     # TODO generate the report
 
 
-if __name__== '__main__':
+if __name__ == '__main__':
     main()
