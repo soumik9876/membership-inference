@@ -1,9 +1,9 @@
 import keras
 import numpy as np
-from sklearn.utils import resample
 import pandas as pd
-from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.utils import resample
 
 LEARNING_RATE = 0.001
 EPOCH = 100
@@ -47,7 +47,21 @@ def load_senti_data(data):
 
     x = dataframe[0].values
     y = dataframe[1].values
-    print(x,y)
+    print(x, y)
+    return x, y
+
+
+def load_hate_data():
+    dataframe = pd.read_csv(f"hate_speech_data/Bengali_hate_speech.csv", header=None)
+    le = LabelEncoder()
+    for col in range(2):
+        dataframe[col] = le.fit_transform(dataframe[col].astype('str'))
+    x_range = [i for i in range(2)]
+    dataframe[x_range] = dataframe[x_range] / dataframe[x_range].max()
+
+    x = dataframe[0].values
+    y = dataframe[1].values
+    print(x, y)
     return x, y
 
 
@@ -68,7 +82,7 @@ def sample_data(train_data, test_data, num_sets):
 
 def build_fcnn_model():
     from keras.models import Sequential
-    from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+    from keras.layers import Dense
     # build the model
     model = Sequential()
     model.add(Dense(512, input_dim=1, activation='tanh'))
@@ -128,16 +142,26 @@ def get_trained_svm_models(train_data, test_data, num_models=1):
     return models
 
 
-def main():
-    print('Hello World!')
-    # load the pre-shuffled train and test data
-    # print(load_senti_data('Train.csv'))
-    # return
-    # (x_train, y_train), (x_test, y_test) = load_data()
-
+def senti_data():
     x_train, y_train = load_senti_data('Train.csv')
     x_test, y_test = load_senti_data('Test.csv')
     # split the data for each model
+    return x_train, y_train, x_test, y_test
+
+
+def hate_data():
+    x, y = load_hate_data()
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.30, random_state=0)
+    return x_train, y_train, x_test, y_test
+
+
+def main():
+
+    x_train, y_train, x_test, y_test = hate_data()
+
+    # uncomment to train senti data
+    # x_train, y_train, x_test, y_test = senti_data()
+
     target_train = (x_train[:TRAINING_SIZE * NUM_TARGET], y_train[:TRAINING_SIZE * NUM_TARGET])
     target_test = (x_test[:TEST_SIZE * NUM_TARGET], y_test[:TEST_SIZE * NUM_TARGET])
     target_train_data, target_test_data = sample_data(target_train, target_test, NUM_TARGET)

@@ -95,7 +95,7 @@ def get_trained_svm_models(train_data, test_data, num_models):
 
 
 def load_bengali_data():
-    df = pandas.read_csv('archive/labels.csv')
+    df = pandas.read_csv('hate_speech_data/labels.csv')
     # print(df.iloc[:3, 1:3])
     x, y = df.iloc[:, :2], df.iloc[:, 2:3]
     x_train, y_train, x_test, y_test = train_test_split(x, y, test_size=.25)
