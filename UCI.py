@@ -1,16 +1,19 @@
 import keras
 import numpy as np
 import pandas as pd
+from keras.utils import to_categorical
+from keras_preprocessing.sequence import pad_sequences
+from keras_preprocessing.text import Tokenizer
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import resample
 
 LEARNING_RATE = 0.001
 EPOCH = 100
-TRAINING_SIZE = 3000
-TEST_SIZE = 1500
+TRAINING_SIZE = 2700
+TEST_SIZE = 500
 NUM_TARGET = 1
-NUM_SHADOW = 20
+NUM_SHADOW = 18
 IN = 1
 OUT = 0
 VERBOSE = 1
@@ -52,7 +55,7 @@ def load_senti_data(data):
 
 
 def load_hate_data():
-    dataframe = pd.read_csv(f"hate_speech_data/Bengali_hate_speech.csv", header=None)
+    dataframe = pd.read_csv(f"hate_speech_data/Bengali_hate_speech.csv", header=None,encoding="utf-8")
     le = LabelEncoder()
     for col in range(2):
         dataframe[col] = le.fit_transform(dataframe[col].astype('str'))
@@ -63,6 +66,45 @@ def load_hate_data():
     y = dataframe[1].values
     print(x, y)
     return x, y
+
+
+def load_hate_data_optimized():
+    # dataframe = pd.read_csv(f"hate_speech_data/Bengali_hate_speech.csv", header=None)
+
+    path = 'hate_speech_data/Bengali_hate_speech.csv'
+    dataframe = pd.read_csv(path, encoding='utf-8')
+
+    dataframe = dataframe.sample(frac=1,
+                                 random_state=42)  # shufling the dataset, random state = 42 ensures reproducibility.
+
+    # remiving everything except Bengali text
+    dataframe['sentence'] = dataframe['sentence'].str.replace(r'[^\u0980-\u09FF ]+', ' ')
+
+    # droppig duplicates
+    dataframe.dropna(subset=['sentence'], inplace=True)
+
+    # removing empty rows
+    dataframe.drop_duplicates(subset=['sentence'], inplace=True)
+
+    # le = LabelEncoder()
+    # for col in range(2):
+    #     dataframe[col] = le.fit_transform(dataframe[col].astype('str'))
+    # x_range = [i for i in range(2)]
+    # dataframe[x_range] = dataframe[x_range] / dataframe[x_range].max()
+
+    # x = dataframe[0].values
+    # y = dataframe[1].values
+
+    max_features = 80000  # Needs to define optimal one later
+    tokenizer = Tokenizer(num_words=max_features, split=' ')
+
+    tokenizer.fit_on_texts(dataframe['sentence'].values)
+    X = tokenizer.texts_to_sequences(dataframe['sentence'].values)
+    X = pad_sequences(X)
+
+    Y = pd.get_dummies(dataframe['hate']).values
+    print(X, Y)
+    return X, Y
 
 
 def sample_data(train_data, test_data, num_sets):
@@ -85,11 +127,11 @@ def build_fcnn_model():
     from keras.layers import Dense
     # build the model
     model = Sequential()
-    model.add(Dense(512, input_dim=1, activation='tanh'))
+    model.add(Dense(512, input_dim=534, activation='tanh'))
     model.add(Dense(512, activation='tanh'))
     model.add(Dense(256, activation='tanh'))
     model.add(Dense(128, activation='tanh'))
-    model.add(Dense(1, activation='sigmoid'))
+    model.add(Dense(2, activation='sigmoid'))
 
     model.summary()
     return model
@@ -150,14 +192,15 @@ def senti_data():
 
 
 def hate_data():
-    x, y = load_hate_data()
+    x, y = load_hate_data_optimized()
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.30, random_state=0)
     return x_train, y_train, x_test, y_test
 
 
 def main():
-
     x_train, y_train, x_test, y_test = hate_data()
+    print(x_train.shape,y_train.shape)
+    # (20843, 534) (20843, 2)
 
     # uncomment to train senti data
     # x_train, y_train, x_test, y_test = senti_data()
