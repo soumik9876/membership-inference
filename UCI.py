@@ -11,9 +11,9 @@ from sklearn.utils import resample
 LEARNING_RATE = 0.001
 EPOCH = 100
 TRAINING_SIZE = 2700
-TEST_SIZE = 500
+TEST_SIZE = 1500
 NUM_TARGET = 1
-NUM_SHADOW = 18
+NUM_SHADOW = 20
 IN = 1
 OUT = 0
 VERBOSE = 1
@@ -55,7 +55,7 @@ def load_senti_data(data):
 
 
 def load_hate_data():
-    dataframe = pd.read_csv(f"hate_speech_data/Bengali_hate_speech.csv", header=None,encoding="utf-8")
+    dataframe = pd.read_csv(f"hate_speech_data/Bengali_hate_speech.csv", header=None, encoding="utf-8")
     le = LabelEncoder()
     for col in range(2):
         dataframe[col] = le.fit_transform(dataframe[col].astype('str'))
@@ -159,13 +159,18 @@ def get_attack_dataset(models, train_data, test_data, num_models, data_size):
         # IN data
         x_temp, y_temp = resample(x_train[i], y_train[i], n_samples=data_size, random_state=0)
         for j in range(data_size):
-            y_idx = np.argmax(y_temp[j])
-            x_data[y_idx].append(models[i].predict(x_temp[j:j + 1])[0])
+            y_idx = np.argmax(y_temp[j]) - 1
+            print(f'j is {j}', len(x_temp), x_temp.shape)
+            try:
+                x_data[y_idx].append(models[i].predict(x_temp[j:j + 1])[0])
+            except Exception as e:
+                print(e)
             y_data[y_idx].append(IN)
         # OUT data
         x_temp, y_temp = resample(x_test[i], y_test[i], n_samples=data_size, random_state=0)
         for j in range(data_size):
-            y_idx = np.argmax(y_temp[j])
+            y_idx = np.argmax(y_temp[j]) - 1
+            print(f'y_idx : {y_idx} {len(x_data)} {len(y_data)}')
             x_data[y_idx].append(models[i].predict(x_temp[j:j + 1])[0])
             y_data[y_idx].append(OUT)
     return x_data, y_data
@@ -199,7 +204,7 @@ def hate_data():
 
 def main():
     x_train, y_train, x_test, y_test = hate_data()
-    print(x_train.shape,y_train.shape)
+    print(x_train.shape, y_train.shape)
     # (20843, 534) (20843, 2)
 
     # uncomment to train senti data
